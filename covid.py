@@ -40,7 +40,7 @@ def normolize_string(string: str):
     return string
 
 
-def fill_сases_sheet(ws: Worksheet, regions_full_name: dict, regions_short_name, dates):
+def fill_сases_sheet(ws: Worksheet, regions: dict, dates):
     OVERALL_CASES_FORMULA_ROW = 88
 
     last_available_date = datetime.strptime(dates[-1], '%Y-%m-%d')
@@ -55,16 +55,12 @@ def fill_сases_sheet(ws: Worksheet, regions_full_name: dict, regions_short_name
         for row in range(*REGION_ROWS_RANGE):
             name = ws.cell(row=row, column=REGION_COLUMN).value
             key = normolize_string(name)
-            if key in regions_full_name:
+            if key in regions:
                 ws.cell(row=row, column=(last_column + i)).value = \
-                    regions_full_name[key]['cases'][(i - 1) - new_days_amount][0]
-
-            elif key in regions_short_name:
-                ws.cell(row=row, column=(last_column + i)).value = \
-                    regions_short_name[key]['cases'][(i - 1) - new_days_amount][0]
+                    regions[key]['cases'][(i - 1) - new_days_amount][0]
 
             else:
-                raise KeyError
+                raise KeyError(key)
 
         formula = ws.cell(row=OVERALL_CASES_FORMULA_ROW, column=ws.max_column - 1).value
         last_cell_id = get_column_letter(ws.max_column - 1) + str(OVERALL_CASES_FORMULA_ROW)
@@ -75,9 +71,9 @@ def fill_сases_sheet(ws: Worksheet, regions_full_name: dict, regions_short_name
             'current_date': last_table_date + timedelta(days=new_days_amount)}
 
 
-def get_regions_info() -> Tuple[dict, dict, list]:
-    regions_full_name = {}
-    regions_short_name = {}
+def get_regions_info() -> Tuple[dict, list]:
+    final = {}
+    # regions_short_name = {}
 
     session = HTMLSession()
     response: dict = session.get(URL, verify=False).json()
@@ -88,9 +84,10 @@ def get_regions_info() -> Tuple[dict, dict, list]:
         short_name = regions[region]['info']['short_name']
         regions[region]['info'].pop('name', None)
         regions[region]['info'].pop('short_name', None)
-        regions_full_name[normolize_string(full_name)] = regions[region]
-        regions_short_name[normolize_string(short_name)] = regions[region]
-    return regions_full_name, regions_short_name, dates
+        final.update(dict.fromkeys([normolize_string(full_name), normolize_string(short_name)], region))
+        # regions_full_name[normolize_string(full_name)] = regions[region]
+        # regions_short_name[normolize_string(short_name)] = regions[region]
+    return final, dates
 
 
 def continue_formula_right(ws: Worksheet, rows: list, column: int):
@@ -173,6 +170,7 @@ def weekly_gain_sheet(wb, info_dict: dict):
 
 def cases_sheet(wb):
     regions_info = get_regions_info()
+    print(regions_info)
     info_dict = fill_сases_sheet(wb[SHEET_NAME_CASES], *regions_info)
 
     gain_sheet(wb['Прирост'], info_dict)
